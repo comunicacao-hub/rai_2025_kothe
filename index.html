@@ -15,18 +15,25 @@
     <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.js"></script>
 
     <style>
+        /* Trava a rolagem horizontal para evitar o "tilt" da barra durante a animação */
         body {
             background-color: #f3f4f6;
+            overflow-x: hidden; 
         }
 
         /* Container do Livro */
-        .flipbook-container {
+        .flipbook-wrapper {
             width: 100%;
-            height: 70vh;
+            height: 85vh; /* Aumentado para o livro ficar maior na tela */
             display: flex;
             justify-content: center;
             align-items: center;
-            perspective: 2000px;
+            overflow: visible;
+        }
+
+        .flipbook-container {
+            transition: transform 0.3s ease-out; /* Animação suave para o zoom */
+            transform-origin: top center; /* O zoom expande a partir do topo para não sumir da tela */
         }
 
         /* Estilização individual de cada página gerada */
@@ -62,24 +69,34 @@
         .page-empty {
             background-color: #fdfdfd;
         }
+
+        /* Remove as setinhas feias do input numérico */
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col font-sans text-gray-800">
 
     <!-- Cabeçalho -->
-    <header class="bg-white shadow-sm py-5 mb-6">
+    <header class="bg-white shadow-sm py-4 mb-4">
         <div class="container mx-auto px-4 text-center flex flex-col items-center">
-            <svg class="text-blue-900" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="text-blue-900" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
             </svg>
         </div>
     </header>
 
     <!-- Conteúdo Principal -->
-    <main class="container mx-auto px-4 max-w-6xl flex-grow flex flex-col items-center justify-center">
+    <main class="container mx-auto px-4 max-w-6xl flex-grow flex flex-col items-center justify-start">
 
         <!-- Seção de Carregamento -->
-        <div id="loading-section" class="w-full max-w-xl bg-white rounded-2xl shadow-sm p-12 text-center">
+        <div id="loading-section" class="w-full max-w-xl bg-white rounded-2xl shadow-sm p-12 text-center mt-12">
             <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-900 mx-auto mb-6"></div>
             <h2 class="text-2xl font-bold text-gray-800 mb-2">Processando Documento</h2>
             <p id="loading-text" class="text-blue-900 font-medium text-lg mb-6">Iniciando leitura...</p>
@@ -92,21 +109,42 @@
         <div id="viewer-section" class="hidden flex-col items-center w-full">
             
             <!-- Barra de Ferramentas Superior -->
-            <div class="w-full mb-4 flex flex-col md:flex-row justify-end items-center bg-white p-4 rounded-xl shadow-sm gap-4">
-                <div class="text-gray-600 font-semibold bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
-                    <span id="page-count">Página 1</span>
+            <div class="w-full mb-4 flex flex-col md:flex-row justify-between items-center bg-white p-3 rounded-xl shadow-sm gap-4 z-10 relative">
+                
+                <!-- Ferramentas de Zoom -->
+                <div class="flex gap-2 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
+                    <button id="btn-zoom-out" class="p-2 text-gray-600 hover:text-blue-900 hover:bg-gray-200 rounded-md transition" title="Reduzir Zoom">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                    </button>
+                    <div class="w-px bg-gray-300 my-1"></div>
+                    <button id="btn-zoom-in" class="p-2 text-gray-600 hover:text-blue-900 hover:bg-gray-200 rounded-md transition" title="Aumentar Zoom">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                    </button>
+                    <button id="btn-zoom-reset" class="p-2 text-sm text-gray-500 hover:text-blue-900 hover:bg-gray-200 rounded-md transition font-medium" title="Tamanho Original">
+                        100%
+                    </button>
+                </div>
+
+                <!-- Navegação de Páginas -->
+                <div class="flex items-center gap-3 text-gray-600 font-semibold bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+                    <span class="text-sm">Página</span>
+                    <input type="number" id="page-input" class="w-14 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-900 font-bold bg-white py-1" value="1" min="1">
+                    <span class="text-sm text-gray-500">de <span id="total-pages">-</span></span>
+                    <button id="btn-go-page" class="ml-1 bg-blue-100 text-blue-900 px-3 py-1 rounded text-sm hover:bg-blue-200 transition font-bold uppercase tracking-wider">Ir</button>
                 </div>
             </div>
 
-            <!-- Container Principal do Flipbook -->
-            <div class="flipbook-container relative">
-                <div id="flipbook">
-                    <!-- As páginas serão injetadas aqui pelo JavaScript -->
+            <!-- Container Principal do Flipbook com Wrapper para controle do Zoom -->
+            <div class="flipbook-wrapper relative overflow-x-auto overflow-y-visible w-full custom-scrollbar pb-10">
+                <div class="flipbook-container" id="flipbook-container">
+                    <div id="flipbook">
+                        <!-- As páginas serão injetadas aqui pelo JavaScript -->
+                    </div>
                 </div>
             </div>
 
-            <!-- Controles Inferiores (Navegação) -->
-            <div class="mt-8 flex gap-6">
+            <!-- Controles Inferiores (Navegação Setas) -->
+            <div class="mt-4 flex gap-6 z-10">
                 <button id="btn-prev" class="bg-white border-2 border-blue-900 text-blue-900 px-6 py-3 rounded-xl hover:bg-blue-50 transition shadow-sm flex items-center gap-2 font-semibold group">
                     <svg class="transform group-hover:-translate-x-1 transition" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> 
                     Anterior
@@ -144,19 +182,28 @@
 
         // =======================================================
         // NOME DO SEU ARQUIVO PDF AQUI:
-        const ARQUIVO_PDF = './RAI_2025_(VERSÃO DIGITAL).pdf'; // <-- MUDE ISTO PARA O NOME DO SEU PDF
+        const ARQUIVO_PDF = './RAI_2025_(VERSÃO DIGITAL)'; // <-- MUDE ISTO PARA O NOME DO SEU PDF
         // =======================================================
 
         // Variáveis de escopo global
         let pageFlip = null;
+        let currentZoom = 1;
 
         // Elementos do DOM
         const loadingSection = document.getElementById('loading-section');
         const viewerSection = document.getElementById('viewer-section');
         const loadingText = document.getElementById('loading-text');
         const progressBar = document.getElementById('progress-bar');
+        const flipbookContainer = document.getElementById('flipbook-container');
         const flipbookEl = document.getElementById('flipbook');
-        const pageCountEl = document.getElementById('page-count');
+        
+        // Elementos da Toolbar
+        const pageInput = document.getElementById('page-input');
+        const totalPagesEl = document.getElementById('total-pages');
+        const btnGoPage = document.getElementById('btn-go-page');
+        const btnZoomIn = document.getElementById('btn-zoom-in');
+        const btnZoomOut = document.getElementById('btn-zoom-out');
+        const btnZoomReset = document.getElementById('btn-zoom-reset');
 
         // Função Principal de Processamento do PDF
         async function processPDF(url) {
@@ -184,7 +231,8 @@
 
                 // Pega a página 1 apenas para descobrir as dimensões proporcinonais do livro
                 const firstPage = await pdf.getPage(1);
-                const viewport = firstPage.getViewport({ scale: 1.5 }); 
+                // Aumentamos o scale base para o canvas ter maior resolução se o usuário der zoom
+                const viewport = firstPage.getViewport({ scale: 2.0 }); 
                 const baseWidth = viewport.width;
                 const baseHeight = viewport.height;
 
@@ -197,8 +245,8 @@
                     progressBar.style.width = `${(i / numPages) * 100}%`;
 
                     const page = await pdf.getPage(i);
-                    // Scale 1.5 oferece um bom balanço entre alta resolução e uso de memória
-                    const pageViewport = page.getViewport({ scale: 1.5 });
+                    // Renderiza em alta resolução
+                    const pageViewport = page.getViewport({ scale: 2.0 });
 
                     // Cria um canvas para renderizar os visuais do PDF
                     const canvas = document.createElement('canvas');
@@ -206,7 +254,7 @@
                     canvas.width = pageViewport.width;
                     canvas.height = pageViewport.height;
 
-                    // Preenche de branco antes de renderizar para garantir que a mistura de cores (sombras da dobra) funcione bem
+                    // Preenche de branco antes de renderizar para garantir que a mistura de cores funcione bem
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -246,7 +294,7 @@
                 viewerSection.classList.remove('hidden');
                 viewerSection.classList.add('flex');
 
-                // Inicia o livro animado com o elemento já visível
+                // Inicia o livro animado
                 initFlipbook(baseWidth, baseHeight);
 
             } catch (error) {
@@ -258,7 +306,6 @@
 
         // Inicializador da Biblioteca PageFlip
         function initFlipbook(width, height) {
-            // Se já existir um livro renderizado, destruí-lo antes de criar outro
             if (pageFlip) {
                 pageFlip.destroy();
             }
@@ -266,31 +313,62 @@
             pageFlip = new St.PageFlip(flipbookEl, {
                 width: width,        // Largura base da página (calculada do PDF)
                 height: height,      // Altura base da página
-                size: "stretch",     // Corrigido: a biblioteca suporta apenas "fixed" ou "stretch"
+                size: "stretch",     // Permite esticar de forma controlada
                 minWidth: 300,
-                maxWidth: 1500,
+                maxWidth: 2000,
                 minHeight: 400,
-                maxHeight: 2000,
+                maxHeight: 2500,
                 maxShadowOpacity: 0.4, // Opacidade da sombra de dobra
                 showCover: true,       // Página 1 funciona como capa isolada
                 mobileScrollSupport: false, 
                 usePortrait: true      // Tela em pé muda para apenas 1 página visível
             });
 
-            // Carrega todos os elementos DOM .page do container
             const pages = document.querySelectorAll('.page');
             pageFlip.loadFromHTML(pages);
 
-            pageCountEl.innerText = `Capa (1 de ${pages.length})`;
+            // Configura os inputs de página
+            pageInput.max = pages.length;
+            totalPagesEl.innerText = pages.length;
+            pageInput.value = 1;
 
             // Evento disparado quando o usuário vira a página
             pageFlip.on('flip', (e) => {
-                let currentPage = e.data + 1;
-                pageCountEl.innerText = `Página ${currentPage} de ${pages.length}`;
+                pageInput.value = e.data + 1;
             });
         }
 
-        // Controles de Navegação via Botão
+        // ==========================================
+        // CONTROLES DE ZOOM
+        // ==========================================
+        function applyZoom() {
+            flipbookContainer.style.transform = `scale(${currentZoom})`;
+            btnZoomReset.innerText = `${Math.round(currentZoom * 100)}%`;
+        }
+
+        btnZoomIn.addEventListener('click', () => {
+            if (currentZoom < 3.0) { // Limite máximo de zoom 300%
+                currentZoom += 0.2;
+                applyZoom();
+            }
+        });
+
+        btnZoomOut.addEventListener('click', () => {
+            if (currentZoom > 0.6) { // Limite mínimo de zoom 60%
+                currentZoom -= 0.2;
+                applyZoom();
+            }
+        });
+
+        btnZoomReset.addEventListener('click', () => {
+            currentZoom = 1;
+            applyZoom();
+        });
+
+
+        // ==========================================
+        // CONTROLES DE NAVEGAÇÃO
+        // ==========================================
         document.getElementById('btn-prev').addEventListener('click', () => {
             if (pageFlip) pageFlip.flipPrev();
         });
@@ -298,7 +376,34 @@
             if (pageFlip) pageFlip.flipNext();
         });
 
-        // Controles de Modal de Erro
+        // Função de ir para a página digitada
+        function goToSelectedPage() {
+            if (!pageFlip) return;
+            
+            let targetPage = parseInt(pageInput.value);
+            const total = pageFlip.getPageCount();
+            
+            // Validações para não quebrar a biblioteca
+            if (isNaN(targetPage)) targetPage = 1;
+            if (targetPage < 1) targetPage = 1;
+            if (targetPage > total) targetPage = total;
+            
+            // A biblioteca usa índice baseado em 0 (página 1 = index 0)
+            pageFlip.turnToPage(targetPage - 1);
+            pageInput.value = targetPage;
+        }
+
+        btnGoPage.addEventListener('click', goToSelectedPage);
+        pageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                goToSelectedPage();
+                pageInput.blur(); // Tira o foco do teclado no celular
+            }
+        });
+
+        // ==========================================
+        // UTILITÁRIOS
+        // ==========================================
         function showError(msg) {
             document.getElementById('error-message').innerText = msg;
             document.getElementById('error-modal').classList.remove('hidden');
@@ -307,7 +412,7 @@
             document.getElementById('error-modal').classList.add('hidden');
         }
 
-        // Inicialização: Carregar automaticamente o arquivo PDF configurado
+        // Inicialização: Carregar automaticamente
         window.addEventListener('DOMContentLoaded', () => {
             processPDF(ARQUIVO_PDF);
         });
