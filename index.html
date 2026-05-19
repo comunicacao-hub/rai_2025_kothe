@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlipBook</title>
+    
+    <!-- Tailwind CSS para Estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PDF.js para leitura e renderização de PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    
+    <!-- PageFlip para o efeito de virar página -->
+    <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.js"></script>
+
+    <style>
+        body {
+            background-color: #f3f4f6;
+        }
+
+        /* Container do Livro */
+        .flipbook-container {
+            width: 100%;
+            height: 70vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 2000px;
+        }
+
+        /* Estilização individual de cada página gerada */
+        .page {
+            background-color: #ffffff;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+            box-shadow: inset -1px 0 5px rgba(0,0,0,0.05);
+        }
+
+        /* Sombras internas para simular a dobra do livro */
+        .page.--left {
+            border-right: 0;
+            box-shadow: inset -40px 0 50px -15px rgba(0,0,0,0.12), inset -2px 0 5px rgba(0,0,0,0.05);
+            background: linear-gradient(to right, #ffffff 0%, #fafafa 80%, #e0e0e0 100%);
+        }
+        .page.--right {
+            border-left: 0;
+            box-shadow: inset 40px 0 50px -15px rgba(0,0,0,0.12), inset 2px 0 5px rgba(0,0,0,0.05);
+            background: linear-gradient(to left, #ffffff 0%, #fafafa 80%, #e0e0e0 100%);
+        }
+
+        /* A imagem/canvas dentro da página */
+        .page canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background-color: transparent;
+            mix-blend-mode: multiply; /* Permite que o gradiente da dobra apareça através do PDF branco */
+        }
+
+        /* Página em branco (verso da capa e frente da contracapa) */
+        .page-empty {
+            background-color: #fdfdfd;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans text-gray-800">
+
+    <!-- Cabeçalho -->
+    <header class="bg-white shadow-sm py-5 mb-6">
+        <div class="container mx-auto px-4 text-center flex flex-col items-center">
+            <svg class="text-blue-900" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+            </svg>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="container mx-auto px-4 max-w-6xl flex-grow flex flex-col items-center justify-center">
+
+        <!-- Seção de Carregamento -->
+        <div id="loading-section" class="w-full max-w-xl bg-white rounded-2xl shadow-sm p-12 text-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-900 mx-auto mb-6"></div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Processando Documento</h2>
+            <p id="loading-text" class="text-blue-900 font-medium text-lg mb-6">Iniciando leitura...</p>
+            <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div id="progress-bar" class="bg-blue-900 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Seção do Visualizador Flipbook -->
+        <div id="viewer-section" class="hidden flex-col items-center w-full">
+            
+            <!-- Barra de Ferramentas Superior -->
+            <div class="w-full mb-4 flex flex-col md:flex-row justify-end items-center bg-white p-4 rounded-xl shadow-sm gap-4">
+                <div class="text-gray-600 font-semibold bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
+                    <span id="page-count">Página 1</span>
+                </div>
+            </div>
+
+            <!-- Container Principal do Flipbook -->
+            <div class="flipbook-container relative">
+                <div id="flipbook">
+                    <!-- As páginas serão injetadas aqui pelo JavaScript -->
+                </div>
+            </div>
+
+            <!-- Controles Inferiores (Navegação) -->
+            <div class="mt-8 flex gap-6">
+                <button id="btn-prev" class="bg-white border-2 border-blue-900 text-blue-900 px-6 py-3 rounded-xl hover:bg-blue-50 transition shadow-sm flex items-center gap-2 font-semibold group">
+                    <svg class="transform group-hover:-translate-x-1 transition" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> 
+                    Anterior
+                </button>
+                <button id="btn-next" class="bg-blue-900 text-white px-6 py-3 rounded-xl hover:bg-blue-950 transition shadow-md flex items-center gap-2 font-semibold group">
+                    Próxima 
+                    <svg class="transform group-hover:translate-x-1 transition" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="mt-auto py-6 text-center text-gray-400 text-sm">
+        Construído com PDF.js e Turn/PageFlip.
+    </footer>
+
+    <!-- Modal de Erro -->
+    <div id="error-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center">
+            <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-800 mb-2">Ops! Ocorreu um erro</h3>
+            <p id="error-message" class="text-gray-600 mb-8"></p>
+            <button onclick="closeError()" class="bg-gray-800 text-white px-6 py-3 rounded-xl hover:bg-gray-900 w-full font-semibold transition">Entendi</button>
+        </div>
+    </div>
+
+    <!-- Script de Lógica da Aplicação -->
+    <script>
+        // Configuração inicial do Worker do PDF.js
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        // =======================================================
+        // NOME DO SEU ARQUIVO PDF AQUI:
+        const ARQUIVO_PDF = './RAI_2025_(VERSÃO DIGITAL).pdf'; // <-- MUDE ISTO PARA O NOME DO SEU PDF
+        // =======================================================
+
+        // Variáveis de escopo global
+        let pageFlip = null;
+
+        // Elementos do DOM
+        const loadingSection = document.getElementById('loading-section');
+        const viewerSection = document.getElementById('viewer-section');
+        const loadingText = document.getElementById('loading-text');
+        const progressBar = document.getElementById('progress-bar');
+        const flipbookEl = document.getElementById('flipbook');
+        const pageCountEl = document.getElementById('page-count');
+
+        // Função Principal de Processamento do PDF
+        async function processPDF(url) {
+            loadingSection.classList.remove('hidden');
+            viewerSection.classList.add('hidden');
+            viewerSection.classList.remove('flex');
+            progressBar.style.width = '0%';
+
+            try {
+                loadingText.innerText = "A transferir o livro...";
+                
+                // Faz o download direto do mesmo servidor (GitHub Pages)
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Arquivo não encontrado (${response.status}). Verifique se o nome do PDF está correto no código e se o arquivo foi submetido para o GitHub.`);
+                }
+                
+                const arrayBuffer = await response.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const numPages = pdf.numPages;
+
+                if (numPages === 0) {
+                    throw new Error("O PDF está vazio.");
+                }
+
+                // Pega a página 1 apenas para descobrir as dimensões proporcinonais do livro
+                const firstPage = await pdf.getPage(1);
+                const viewport = firstPage.getViewport({ scale: 1.5 }); 
+                const baseWidth = viewport.width;
+                const baseHeight = viewport.height;
+
+                // Limpa contêiner de páginas antes de gerar novas
+                flipbookEl.innerHTML = ''; 
+
+                // Processa cada página iterativamente
+                for (let i = 1; i <= numPages; i++) {
+                    loadingText.innerText = `Processando imagem da página ${i} de ${numPages}...`;
+                    progressBar.style.width = `${(i / numPages) * 100}%`;
+
+                    const page = await pdf.getPage(i);
+                    // Scale 1.5 oferece um bom balanço entre alta resolução e uso de memória
+                    const pageViewport = page.getViewport({ scale: 1.5 });
+
+                    // Cria um canvas para renderizar os visuais do PDF
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = pageViewport.width;
+                    canvas.height = pageViewport.height;
+
+                    // Preenche de branco antes de renderizar para garantir que a mistura de cores (sombras da dobra) funcione bem
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    await page.render({ canvasContext: ctx, viewport: pageViewport }).promise;
+
+                    // Cria a div empacotadora que será usada como "página"
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page';
+                    pageDiv.appendChild(canvas);
+                    
+                    flipbookEl.appendChild(pageDiv);
+
+                    // Adicionar verso em branco para a capa (página 1)
+                    if (i === 1 && numPages > 1) {
+                        const emptyInsideCover = document.createElement('div');
+                        emptyInsideCover.className = 'page page-empty';
+                        flipbookEl.appendChild(emptyInsideCover);
+                    }
+
+                    // Adicionar frente em branco para a contracapa (antes da última página)
+                    if (i === numPages - 1 && numPages > 1) {
+                        const emptyInsideBack = document.createElement('div');
+                        emptyInsideBack.className = 'page page-empty';
+                        flipbookEl.appendChild(emptyInsideBack);
+                    }
+
+                    // Pequena pausa na thread para a interface gráfica respirar/atualizar visualmente
+                    await new Promise(r => setTimeout(r, 10));
+                }
+
+                loadingText.innerText = "Preparando a encadernação virtual...";
+                progressBar.style.width = '100%';
+                await new Promise(r => setTimeout(r, 200)); 
+
+                // IMPORTANTE: Mostrar o visualizador antes de iniciar o PageFlip.
+                loadingSection.classList.add('hidden');
+                viewerSection.classList.remove('hidden');
+                viewerSection.classList.add('flex');
+
+                // Inicia o livro animado com o elemento já visível
+                initFlipbook(baseWidth, baseHeight);
+
+            } catch (error) {
+                console.warn("Aviso ao processar PDF:", error);
+                loadingSection.classList.add('hidden');
+                showError(error.message || "Ocorreu um erro ao ler o PDF.");
+            }
+        }
+
+        // Inicializador da Biblioteca PageFlip
+        function initFlipbook(width, height) {
+            // Se já existir um livro renderizado, destruí-lo antes de criar outro
+            if (pageFlip) {
+                pageFlip.destroy();
+            }
+
+            pageFlip = new St.PageFlip(flipbookEl, {
+                width: width,        // Largura base da página (calculada do PDF)
+                height: height,      // Altura base da página
+                size: "stretch",     // Corrigido: a biblioteca suporta apenas "fixed" ou "stretch"
+                minWidth: 300,
+                maxWidth: 1500,
+                minHeight: 400,
+                maxHeight: 2000,
+                maxShadowOpacity: 0.4, // Opacidade da sombra de dobra
+                showCover: true,       // Página 1 funciona como capa isolada
+                mobileScrollSupport: false, 
+                usePortrait: true      // Tela em pé muda para apenas 1 página visível
+            });
+
+            // Carrega todos os elementos DOM .page do container
+            const pages = document.querySelectorAll('.page');
+            pageFlip.loadFromHTML(pages);
+
+            pageCountEl.innerText = `Capa (1 de ${pages.length})`;
+
+            // Evento disparado quando o usuário vira a página
+            pageFlip.on('flip', (e) => {
+                let currentPage = e.data + 1;
+                pageCountEl.innerText = `Página ${currentPage} de ${pages.length}`;
+            });
+        }
+
+        // Controles de Navegação via Botão
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            if (pageFlip) pageFlip.flipPrev();
+        });
+        document.getElementById('btn-next').addEventListener('click', () => {
+            if (pageFlip) pageFlip.flipNext();
+        });
+
+        // Controles de Modal de Erro
+        function showError(msg) {
+            document.getElementById('error-message').innerText = msg;
+            document.getElementById('error-modal').classList.remove('hidden');
+        }
+        function closeError() {
+            document.getElementById('error-modal').classList.add('hidden');
+        }
+
+        // Inicialização: Carregar automaticamente o arquivo PDF configurado
+        window.addEventListener('DOMContentLoaded', () => {
+            processPDF(ARQUIVO_PDF);
+        });
+    </script>
+</body>
+</html>
